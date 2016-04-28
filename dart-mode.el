@@ -1126,14 +1126,14 @@ The buffer name is dart-hirerachy"
 		 (element (assoc 'classElement (aref hierarchy 0)))
 		 (location (assoc 'location element))
 		 (filename (cdr (assoc 'file location)))
-		 (offset (cdr (assoc 'offset location))
-			 (name (cdr (assoc 'name element))))
-		 (dart--format-for-tree
-		  (list name filename offset
-			(dart--interfaces-implemented hierarchy 0)
-			(dart--mixins hierarchy 0)
-			(dart--superclasses hierarchy 0)))
-		 (dart--show-tree)))))
+		 (offset (cdr (assoc 'offset location)))
+		 (name (cdr (assoc 'name element))))
+      (dart--format-for-tree
+       (list name filename offset
+	     (dart--interfaces-implemented hierarchy 0)
+	     (dart--mixins hierarchy 0)
+	     (dart--superclasses hierarchy 0)))
+      (dart--show-tree))))
 
 (defun dart-type-hierarchy ()
   "Show type hierarchy for symbol at point"
