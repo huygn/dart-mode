@@ -524,6 +524,9 @@ buffers, even if the buffers have not changed.")
 (defvar dart-completion-callback nil
   "The callback to call to support completion.")
 
+(defvar widget--tree-list nil
+  "Widgets for the type hierarchy.")
+
 (defcustom dart-executable-path (file-truename (executable-find "dart"))
   "The absolute path to the 'dart' executable."
   :group 'dart-mode
@@ -986,6 +989,162 @@ Argument POINT restore point after inserting new content."
 	 (point (point)))
      (lambda (response)
        (dart--process-format-info response buffer point)))))
+
+
+
+(defun dart--open-file (but &rest ignore)
+  "Open the file represented by the current widget.
+Argument BUT The button which describes the file to be opened."
+  (let* ((symClass (intern (widget-get but :class)))
+	 (buffer (find-file-noselect (get symClass  'file ))))
+    (with-current-buffer buffer
+      (goto-char (1+ (get symClass 'offset))))
+    (display-buffer buffer)))
+
+(defun widget-tree-widget (type)
+  "Create the subclasses widgets for the current widget TYPE.
+If no subclasses exist, display a button"
+  (let ((list (assoc type widget--tree-list)))
+    (if list `(tree-widget
+	       :open t
+	       :node (push-button
+		      :class ,(symbol-name type)
+		      :tag ,(format "%s%s" type (get type 'info))
+		      :format "%[%t%]\n"
+		      :notify dart--open-file)
+	       :expander widget-tree-expand)
+      `(push-button
+	:format "%[%t%]\n"
+	:tag ,(format "%s" type)
+	:notify dart--open-file))))
+
+(defun widget-tree-expand (tree)
+  "The expand action callback.  Show children if any for TREE."
+  (or (widget-get tree :args)
+      (let ((type  (intern (widget-get (tree-widget-node tree) :class))))
+	(mapcar 'widget-tree-widget
+		(cdr (assoc-string type widget--tree-list))))))
+
+(defun dart--show-tree ()
+  "Build the widget tree and display in a buffer.
+Buffer location can be controlled by ‘display-buffer-alist’
+The buffer name is dart-hirerachy"
+  (let ((buffer (get-buffer-create "dart-hierarchy")))
+    (with-current-buffer buffer
+      (kill-all-local-variables)
+      (erase-buffer)
+      (widget-create (widget-tree-widget 'Object))
+      (if (require 'tree-mode nil t)
+	  (tree-minor-mode t)
+	(widget-insert "\n\n")
+	(widget-insert "   I recommend you use ")
+	(widget-create 'url-link
+		       :button-prefix ""
+		       :button-suffix ""
+		       :format "%[tree-mode%]"
+		       :button-face 'info-xref
+		       "http://www.emacswiki.org/cgi-bin/wiki/tree-mode.el")
+	(widget-insert " to browse tree-widget.\n\n")))
+    (display-buffer buffer)))
+
+(defun dart--mixins (hierarchy index)
+  "Retrieves information about mixins for the class in HIERARCHY at INDEX."
+  (let (mixinImpl '())
+    (-when-let* ((mixins (cdr(assoc 'mixins (aref hierarchy index)))))
+      (loop for i across mixins do
+	    (push (cdr (assoc 'name (assoc 'classElement (aref hierarchy i))))
+		  mixinImpl)))
+    `,mixinImpl))
+
+(defun dart--interfaces-implemented (hierarchy index)
+  "Retrieves information about interfaces for the class in HIERARCHY at INDEX."
+  (let (interfacesImpl '())
+    (-when-let* ((interfaces (cdr(assoc 'interfaces (aref hierarchy index)))))
+      (loop for i across interfaces do
+	    (push (cdr (assoc 'name (assoc 'classElement (aref hierarchy i))))
+		  interfacesImpl)))
+    `,interfacesImpl))
+
+(defun dart--superclasses (hierarchy index)
+  "Returns the superclass information including mixins and interfaces."
+  (-when-let* ((sindex (cdr (assoc 'superclass (aref hierarchy index))))
+	       (element (assoc 'classElement (aref hierarchy sindex)))
+	       (filename (cdr (assoc 'file (assoc 'location element))))
+	       (offset (cdr (assoc 'offset (assoc 'location element))))
+               (sclass (cdr (assoc 'name element))))
+    (if (not (string= sclass nil))
+	(cons `(,sclass ,filename ,offset
+			,(dart--interfaces-implemented  hierarchy sindex)
+			,(dart--mixins  hierarchy sindex))
+	      (dart--superclasses hierarchy sindex)))))
+
+(defun dart--make-infoClause (interfaces mixins)
+  "Format the INTERFACES and MIXINS clauses."
+  (format "%s%s"
+	  (if (seq-empty-p  interfaces) ""
+	    (format "%s%s" " implements "
+		    (mapconcat 'identity interfaces ",")))
+	  (if (seq-empty-p mixins) ""
+	    (format "%s%s" " with "
+		    (mapconcat 'identity mixins ",")))))
+
+(defun dart--create-tree-widget (class)
+  "Creates a symbol for CLASS and attaches properties."
+  (let* ((className (nth 0 class))
+	 (filename (nth 1 class))
+	 (offset (nth 2 class))
+         (interfaces (nth 3 class))
+	 (mixins (nth 4 class))
+	 (symClass (intern className))
+	 (infoClause (dart--make-infoClause interfaces mixins)))
+    (setplist symClass `(file ,filename  offset ,offset info ,infoClause))
+    symClass))
+
+
+(defun dart--format-for-tree (hierarchy)
+  (let* ((className (nth 0 hierarchy))
+	 (filename (nth 1 hierarchy))
+         (offset (nth 2 hierarchy))
+         (interfaces (nth 3 hierarchy))
+	 (mixins (nth 4 hierarchy))
+	 (superClasses (nth 5 hierarchy))
+	 widgets)
+    (push (dart--create-tree-widget
+	   (list className filename offset interfaces mixins))
+	  widgets)
+    (loop for class in superClasses do
+          (push  (dart--create-tree-widget class)
+		 widgets))
+    (setq widget--tree-list (-partition-all-in-steps 2 1 widgets))))
+
+(defun dart--show-hierachy(response)
+  "Builds data structure for tree-widget and displays the tree."
+  (dart-info (format "Reporting hierarchy : %s" response))
+  (let (superClasses mixins interfaces classInfo
+		     (result (assoc 'result response)))
+    (-when-let* ((hierarchy (cdr (assoc 'hierarchyItems result)))
+		 (element (assoc 'classElement (aref hierarchy 0)))
+		 (location (assoc 'location element))
+		 (filename (cdr (assoc 'file location)))
+		 (offset (cdr (assoc 'offset location))
+                 (name (cdr (assoc 'name element))))
+      (dart--format-for-tree
+       (list name filename offset
+	     (dart--interfaces-implemented hierarchy 0)
+	     (dart--mixins hierarchy 0)
+	     (dart--superclasses hierarchy 0)))
+      (dart--show-tree))))
+
+(defun dart-type-hierarchy ()
+  "Show type hierarchy for symbol at point"
+  (interactive)
+  (dart--analysis-server-send
+   "search.getTypeHierarchy"
+   `((file . ,(buffer-file-name))
+     (offset . ,(1- (point)))
+     (superOnly . false))
+   (lambda (response)
+     (dart--show-hierachy response))))
 
 (defun dart-imenu-index ()
   "Callback invoked by imenu-create-index-function."
