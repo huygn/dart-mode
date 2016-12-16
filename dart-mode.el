@@ -234,7 +234,7 @@
 (c-add-style "dart" dart-c-style)
 
 (defvar dart-mode-map (c-make-inherited-keymap)
-  "Keymap used in dart-mode buffers.")
+  "Keymap used in ‘dart-mode’ buffers.")
 
 (define-key dart-mode-map (kbd "C-M-q") 'dart-format-statement)
 (define-key dart-mode-map (kbd "M-.") 'dart-jump-to-defn)
@@ -756,20 +756,28 @@ the callback for that request is given the json decoded response."
                                 (-butlast buf-lines)))))
             (-each json-lines 'dart--analysis-server-handle-msg)))))))
 
-(defun dart--outline-class (class)
+(defun dart--extract-outline (children)
+  "Extracts data and return as a list.
+
+Argument CHILDREN the list from which hierarchy is extracted."
+(let (newlist '())
+  (mapc (lambda (child)
+	      (let* ((element (cdr (assoc 'element child)))
+		     (e-name (cdr (assoc 'name element)))
+		     (offset (cdr (assoc 'offset (cdr (assoc 'location
+	       	     					     element))))))
+	      (push (cons e-name offset) newlist)))
+	children)
+  newlist))
+
+(defun dart--outline-file (elements)
   "Builds the structure needed by Imenu.
 
-Argument CLASS is the class for which structure is being built"
-  (let ((name (cdr (assoc 'name (cdr (assoc 'element class)))))
-	(children (cdr (assoc 'children class)))
-	(class-items '()))
-    (mapc (lambda (child)
-	    (let* ((element (cdr (assoc 'element child)))
-		   (e-name (cdr (assoc 'name element)))
-		   (offset (cdr (assoc 'offset (cdr (assoc 'location
-							   element))))))
-	      (push (cons e-name offset) class-items)))
-	  children)
+Argument ELEMENTS  may be a class or top level functions"
+  (let* ((name (cdr (assoc 'name (cdr (assoc 'element elements)))))
+	(children (cdr (assoc 'children elements)))
+	(class-items (if children (dart--extract-outline children)
+		       (dart--extract-outline (list elements)))))
     (if class-items `(,name . ,class-items))))
 
 (defun dart--execute-outline-callback (msg)
@@ -783,7 +791,7 @@ Argument MSG is the response sent by the analysis server."
 	  (-when-let* ((outline (cdr (assoc 'outline (assoc 'params msg))))
 		       (children (cdr (assoc 'children outline))))
 	    (mapc (lambda (child)
-		    (-if-let (candidates (dart--outline-class child))
+		    (-if-let (candidates (dart--outline-file child))
 			(push candidates classes)))
 		  children))
 	  (delq nil classes))))
