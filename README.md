@@ -27,3 +27,4 @@ Dart Mode is a major mode for editing Dart files in Emacs.
           (lambda ()
             (setq imenu-create-index-function #'dart-imenu-index)))
     ```
+1.  OPTIONAL: To view the class hierarchy install tree-mode
