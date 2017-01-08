@@ -3,7 +3,7 @@
 ;; Author: Natalie Weizenbaum
 ;; URL: http://code.google.com/p/dart-mode
 ;; Version: 0.14
-;; Package-Requires: ((cl-lib "0.5") (dash "2.10.0") (flycheck "0.23"))
+;; Package-Requires: ((cl-lib "0.5") (dash "2.10.0") (flycheck "0.23") (pos-tip "0.4.5""))
 ;; Keywords: language
 
 ;; Copyright (C) 2011 Google Inc.
@@ -40,6 +40,7 @@
 ;;; Code:
 
 (require 'cc-mode)
+(require 'pos-tip)
 (eval-when-compile
   (require 'cc-langs)
   (require 'cc-fonts))
@@ -944,15 +945,6 @@ location to jump to."
     (goto-line line)
     (move-to-column (- col 1))))
 
-(defun dart-jump-to-defn ()
-  "Takes you to the definition of the symbol."
-  (interactive)
-  (let* ((bounds (bounds-of-thing-at-point 'symbol))
-	 (start-offset (- (car bounds) 1))
-	 (end-offset (- (cdr bounds) 1)))
-    (dart--process-nav-info dart--navigation-response start-offset)))
-
-
 (defun dart--change-subscriptions ()
   "Used to set subscriptions when we switch buffers."
   ;; The analysis server changes what is the current buffer.  This can cause an
@@ -985,22 +977,6 @@ Argument POINT restore point after inserting new content."
     (insert replacement)
     (goto-char point)))
 
-(defun dart-format-file ()
-  "Formats the entire file"
-  (interactive)
-  (dart--analysis-server-send
-   "edit.format"
-   `((file . ,(buffer-file-name))
-     (selectionOffset . ,(point-min))
-     (selectionLength . ,(- (buffer-size) 1))
-     (lineLength . 80))
-   (let ((buffer (current-buffer))
-	 (point (point)))
-     (lambda (response)
-       (dart--process-format-info response buffer point)))))
-
-
-
 (defun dart--open-file (but &rest ignore)
   "Open the file represented by the current widget.
 Argument BUT The button which describes the file to be opened."
@@ -1010,7 +986,7 @@ Argument BUT The button which describes the file to be opened."
       (goto-char (1+ (get symClass 'offset))))
     (display-buffer buffer)))
 
-(defun widget-tree-widget (type)
+(defun widget--tree-widget (type)
   "Create the subclasses widgets for the current widget TYPE.
 If no subclasses exist, display a button"
   (let ((list (assoc type widget--tree-list)))
@@ -1021,17 +997,17 @@ If no subclasses exist, display a button"
 		      :tag ,(format "%s%s" type (get type 'info))
 		      :format "%[%t%]\n"
 		      :notify dart--open-file)
-	       :expander widget-tree-expand)
+	       :expander widget--tree-expand)
       `(push-button
 	:format "%[%t%]\n"
 	:tag ,(format "%s" type)
 	:notify dart--open-file))))
 
-(defun widget-tree-expand (tree)
+(defun widget--tree-expand (tree)
   "The expand action callback.  Show children if any for TREE."
   (or (widget-get tree :args)
       (let ((type  (intern (widget-get (tree-widget-node tree) :class))))
-	(mapcar 'widget-tree-widget
+	(mapcar 'widget--tree-widget
 		(cdr (assoc-string type widget--tree-list))))))
 
 (defun dart--show-tree ()
@@ -1042,7 +1018,7 @@ The buffer name is dart-hirerachy"
     (with-current-buffer buffer
       (kill-all-local-variables)
       (erase-buffer)
-      (widget-create (widget-tree-widget 'Object))
+      (widget-create (widget--tree-widget 'Object))
       (if (require 'tree-mode nil t)
 	  (tree-minor-mode t)
 	(widget-insert "\n\n")
@@ -1109,7 +1085,6 @@ The buffer name is dart-hirerachy"
     (setplist symClass `(file ,filename  offset ,offset info ,infoClause))
     symClass))
 
-
 (defun dart--format-for-tree (hierarchy)
   (let* ((className (nth 0 hierarchy))
 	 (filename (nth 1 hierarchy))
@@ -1144,6 +1119,14 @@ The buffer name is dart-hirerachy"
 	     (dart--superclasses hierarchy 0)))
       (dart--show-tree))))
 
+(defun dart--show-hover(response)
+  "Unpacks and shows dartdoc associated with the element."
+  (dart-info (format "Reporting hover : %s" response))
+  (let ((result (assoc 'result response)))
+    (-when-let* ((hovers (cdr (assoc 'hovers result)))
+		 (doc (cdr (assoc 'dartdoc (aref hovers 0)))))
+      (pos-tip-show doc nil nil nil -1))))
+
 (defun dart-type-hierarchy ()
   "Show type hierarchy for symbol at point"
   (interactive)
@@ -1155,10 +1138,41 @@ The buffer name is dart-hirerachy"
    (lambda (response)
      (dart--show-hierachy response))))
 
+(defun dart-hover-information ()
+  "Show dartdoc for symbol at point"
+  (interactive)
+  (dart--analysis-server-send
+   "analysis.getHover"
+   `((file . ,(buffer-file-name))
+     (offset . ,(1- (point))))
+   (lambda (response)
+     (dart--show-hover response))))
+
 (defun dart-imenu-index ()
   "Callback invoked by imenu-create-index-function."
   dart--imenu-candidates)
 
+(defun dart-jump-to-defn ()
+  "Takes you to the definition of the symbol."
+  (interactive)
+  (let* ((bounds (bounds-of-thing-at-point 'symbol))
+	 (start-offset (- (car bounds) 1))
+	 (end-offset (- (cdr bounds) 1)))
+    (dart--process-nav-info dart--navigation-response start-offset)))
+
+(defun dart-format-file ()
+  "Formats the entire file"
+  (interactive)
+  (dart--analysis-server-send
+   "edit.format"
+   `((file . ,(buffer-file-name))
+     (selectionOffset . ,(point-min))
+     (selectionLength . ,(- (buffer-size) 1))
+     (lineLength . 80))
+   (let ((buffer (current-buffer))
+	 (point (point)))
+     (lambda (response)
+       (dart--process-format-info response buffer point)))))
 ;;; Initialization
 
 ;;;###autoload (add-to-list 'auto-mode-alist '("\\.dart\\'" . dart-mode))

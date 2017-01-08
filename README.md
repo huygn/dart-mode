@@ -28,3 +28,12 @@ Dart Mode is a major mode for editing Dart files in Emacs.
             (setq imenu-create-index-function #'dart-imenu-index)))
     ```
 1.  OPTIONAL: To view the class hierarchy install tree-mode
+
+1.  Features & functions: Provides the following functions
+    1. dart-format-file: can be called on a save file hook
+    2. dart-jump-to-defn: bind to a key and navigate source code
+    3. dart-type-hierarchy: bind to a key and show the type hierachy
+    4. dart-hover-information: bind to key and show dartdocs for the element
+
+1. Use [company-dart] (https://github.com/sid-kurias/company-dart) to get intellisense
+   like support.
