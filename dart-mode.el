@@ -233,7 +233,6 @@
 
 (defun dart-block-offset (info)
   "Calculate the correct indentation for inline functions.
-
 When indenting inline functions, we want to pretend that
 functions taking them as parameters essentially don't exist."
   (cl-destructuring-bind (syntax . anchor) info
@@ -264,7 +263,6 @@ This could be either an actual brace-list or an optional parameter."
 (defun dart-in-block-p (syntax-guess)
   "Return whether or not the immediately enclosing {} block is a code block.
 The other option, of course, is a map literal.
-
 SYNTAX-GUESS is the output of `c-guess-basic-syntax'."
   (save-excursion
     (c-safe
@@ -397,7 +395,6 @@ SYNTAX-GUESS is the output of `c-guess-basic-syntax'."
 
 (defun dart-fontify-region (beg end)
   "Use fontify the region between BEG and END as Dart.
-
 This will overwrite fontification due to strings and comments."
   (save-excursion
     (save-match-data
@@ -474,7 +471,6 @@ Each list item should be a regexp matching a single identifier."
     (dart--analysis-server
      (:constructor dart--make-analysis-server))
   "Struct containing data for an instance of a Dart analysis server.
-
 The slots are:
 - `process': the process of the running server.
 - `buffer': the buffer where responses from the server are written."
@@ -489,7 +485,6 @@ The slots are:
 
 (defcustom dart-enable-analysis-server nil
   "If non-nil, enables support for Dart analysis server.
-
 The Dart analysis server adds support for error checking, code completion,
 navigation, and more."
   :group 'dart-mode
@@ -501,7 +496,6 @@ navigation, and more."
 
 (defvar dart--last-analyzed-buffer nil
   "The last buffer analyzed before switching buffers.
-
 This is used to ensure that we resubscribe to events when we switch
 buffers, even if the buffers have not changed.")
 
@@ -536,7 +530,6 @@ buffers, even if the buffers have not changed.")
 
 (defvar dart-analysis-roots nil
   "The list of analysis roots that are known to the analysis server.
-
 All Dart files underneath the analysis roots are analyzed by the analysis
 server.")
 
@@ -545,7 +538,6 @@ server.")
 
 (defvar dart--analysis-server-callbacks nil
   "An alist of ID to callback to be called when the analysis server responds.
-
 Each request to the analysis server has an associated ID.  When the analysis
 server sends a response to a request, it tags the response with the ID of the
 request.  We look up the callback for the request in this alist and run it with
@@ -553,7 +545,9 @@ the JSON decoded server response.")
 
 (defun dart-info (msg)
   "Logs MSG to the dart log if `dart-debug' is non-nil."
-  (when dart-debug (dart-log msg)))
+  (dart-log msg)
+  )
+  ;; (when dart-debug (dart-log msg)))
 
 (defun dart-log (msg)
   "Logs MSG to the dart log."
@@ -571,7 +565,6 @@ the JSON decoded server response.")
 
 (defun dart--start-analysis-server-for-current-buffer ()
   "Initialize Dart analysis server for current buffer.
-
 This starts Dart analysis server and adds either the pub root
 directory or the current file directory to the analysis roots."
   (if (not dart--analysis-server) (dart-start-analysis-server))
@@ -615,7 +608,6 @@ directory or the current file directory to the analysis roots."
 
 (defun dart-add-analysis-overlay ()
   "Report to the Dart analysis server that it should overlay this buffer.
-
 The Dart analysis server allows clients to 'overlay' file contents with
 a client-supplied string.  This is needed because we want Emacs to report
 errors for the current contents of the buffer, not whatever is saved to disk."
@@ -628,7 +620,6 @@ errors for the current contents of the buffer, not whatever is saved to disk."
 (defun dart-change-analysis-overlay
     (change-begin change-end change-before-length)
   "Report to analysis server that it should change the overlay for this buffer.
-
 The region that changed ranges from CHANGE-BEGIN to CHANGE-END, and the
 length of the text before the change is CHANGE-BEFORE-LENGTH. See also
 `dart-add-analysis-overlay'."
@@ -645,7 +636,6 @@ length of the text before the change is CHANGE-BEFORE-LENGTH. See also
 
 (defun dart-remove-analysis-overlay ()
   "Remove the overlay for the current buffer since it has been saved.
-
 See also `dart-add-analysis-overlay'."
   (dart--analysis-server-send
    "analysis.updateContent"
@@ -653,7 +643,6 @@ See also `dart-add-analysis-overlay'."
 
 (defun dart-add-analysis-root-for-file (&optional file)
   "Add the given FILE's root to the analysis server's analysis roots.
-
 A file's root is the pub root if it is in a pub package, or the file's directory
 otherwise.  If no FILE is given, then this will default to the variable
 `buffer-file-name'."
@@ -665,7 +654,6 @@ otherwise.  If no FILE is given, then this will default to the variable
 
 (defun dart-add-to-analysis-roots (dir)
   "Add DIR to the analysis server's analysis roots.
-
 The analysis roots are directories that contain Dart files. The analysis server
 analyzes all Dart files under the analysis roots and provides information about
 them when requested."
@@ -681,7 +669,6 @@ them when requested."
 
 (defun dart--analysis-server-send (method &optional params callback)
   "Send the METHOD request to the server with optional PARAMS.
-
 PARAMS should be JSON-encodable.  If you provide a CALLBACK, it will be called
 with the JSON decoded response.  Otherwise, the output will just be checked."
   (let ((req-without-id (dart--analysis-server-make-request method params)))
@@ -689,7 +676,6 @@ with the JSON decoded response.  Otherwise, the output will just be checked."
 
 (defun dart--analysis-server-make-request (method &optional params)
   "Construct a request for the analysis server.
-
 The constructed request will call METHOD with optional PARAMS."
   `((method . ,method) (params . ,params)))
 
@@ -717,7 +703,6 @@ The constructed request will call METHOD with optional PARAMS."
 
 (defun dart--analysis-server-process-filter (das string)
   "Handle the event or method response from the dart analysis server.
-
 The server DAS has STRING added to the buffer associated with it.
 Method responses are paired according to their pending request and
 the callback for that request is given the json decoded response."
@@ -745,7 +730,6 @@ the callback for that request is given the json decoded response."
 
 (defun dart--extract-outline (children)
   "Extracts data and return as a list.
-
 Argument CHILDREN the list from which hierarchy is extracted."
 (let (newlist '())
   (mapc (lambda (child)
@@ -759,7 +743,6 @@ Argument CHILDREN the list from which hierarchy is extracted."
 
 (defun dart--outline-file (elements)
   "Builds the structure needed by Imenu.
-
 Argument ELEMENTS  may be a class or top level functions"
   (let* ((name (cdr (assoc 'name (cdr (assoc 'element elements)))))
 	(children (cdr (assoc 'children elements)))
@@ -769,7 +752,6 @@ Argument ELEMENTS  may be a class or top level functions"
 
 (defun dart--execute-outline-callback (msg)
   "Called when a completion event is received.
-
 Argument MSG is the response sent by the analysis server."
   ;;Parse the response and store it in a variable. This variable is used when
   ;;the user requests an outline.
@@ -785,7 +767,6 @@ Argument MSG is the response sent by the analysis server."
 
 (defun dart--execute-analysis-callback (msg id)
   "Execute different callbacks depending on the kind of response received.
-
 Argument MSG is the parsed response from the analysis server.
 Argument ID is the id of the event or response sent by the analysis server."
   (-if-let (resp-closure (assoc id dart--analysis-server-callbacks))
@@ -831,7 +812,6 @@ Argument ID is the id of the event or response sent by the analysis server."
 
 (defun dart--report-errors (response buffer callback)
   "Report the errors returned from the analysis server.
-
 The errors contained in RESPONSE from Dart analysis server run on BUFFER are
 reported to CALLBACK."
   (dart-info (format "Reporting to flycheck: %s" response))
@@ -857,7 +837,7 @@ reported to CALLBACK."
      :filename filename
      :line line
      :column column
-     :message msg
+     :message (format "%s\nCorrection: %s" msg (cdr (assoc 'correction err)))
      :level level)))
 
 (defun dart--severity-to-level (severity)
@@ -872,7 +852,6 @@ reported to CALLBACK."
 
 (defun dart-beginning-of-statement ()
   "Moves to the beginning of a Dart statement.
-
 Unlike `c-beginning-of-statement', this handles maps correctly
 and will move to the top level of a bracketed statement."
   (while
@@ -886,7 +865,6 @@ and will move to the top level of a bracketed statement."
 
 (defun -dart-beginning-of-statement-p ()
   "Returns whether the point is at the beginning of a statement.
-
 Statements are assumed to begin on their own lines. This returns
 true for positions before the start of the statement, but on its line."
   (and
@@ -906,7 +884,6 @@ true for positions before the start of the statement, but on its line."
 
 (defun dart--process-nav-info (response offset)
   "Report the possible completions and jump to the location of the definition.
-
 Opens a new file in a new buffer if necessary.
 Argument RESPONSE holds the navigation information received from the analysis
 server.
@@ -948,7 +925,6 @@ location to jump to."
 
 (defun dart--process-format-info (response buffer point)
   "Replace  contents with formatted contents.
-
 Argument RESPONSE is the reformatted content received from the analysis server.
 Argument BUFFER is the buffer whose contents are to be replaced.
 Argument POINT restore point after inserting new content."
@@ -1153,11 +1129,38 @@ The buffer name is dart-hirerachy"
    `((file . ,(buffer-file-name))
      (selectionOffset . ,(point-min))
      (selectionLength . ,(- (buffer-size) 1))
-     (lineLength . 80))
+     (lineLength . 120))
    (let ((buffer (current-buffer))
 	 (point (point)))
      (lambda (response)
        (dart--process-format-info response buffer point)))))
+
+(defun dart-fix ()
+  "Fix"
+  (interactive)
+  (dart--analysis-server-send
+   "edit.getFixes"
+   `((file . ,(buffer-file-name))
+     (offset . ,(1- (point))))
+   (let ((buffer (current-buffer))
+         (point (point)))
+   (lambda (response)
+     (let* (
+        (result (cdr (assoc 'result response)))
+        (fixes (cdr (assoc 'fixes result)))
+        (fixlist (cdr (assoc 'fixes (aref fixes 0))))
+        (editslist (cdr (assoc 'edits (aref fixlist 0))))
+        (edit (cdr (aref editslist 0)))
+        (edit (aref (cdr (assoc 'edits edit)) 0))
+        (start (cdr (assoc 'offset edit)))
+        (end (+ start (cdr (assoc 'length edit))))
+      )
+     (set-buffer buffer)
+     ;; (delete-region start end)
+     (goto-char start)
+     (insert (cdr (assoc 'replacement edit)))
+     (goto-char point))
+   ))))
 ;;; Initialization
 
 ;;;###autoload (add-to-list 'auto-mode-alist '("\\.dart\\'" . dart-mode))
@@ -1165,10 +1168,8 @@ The buffer name is dart-hirerachy"
 ;;;###autoload
 (defun dart-mode ()
   "Major mode for editing Dart files.
-
 The hook `c-mode-common-hook' is run with no args at mode
 initialization, then `dart-mode-hook'.
-
 Key bindings:
 \\{dart-mode-map}"
   (interactive)
