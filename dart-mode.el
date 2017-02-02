@@ -1135,7 +1135,7 @@ The buffer name is dart-hirerachy"
      (lambda (response)
        (dart--process-format-info response buffer point)))))
 
-(defun dart-fix ()
+(defun dart-quick-fix ()
   "Fix"
   (interactive)
   (dart--analysis-server-send
@@ -1156,8 +1156,8 @@ The buffer name is dart-hirerachy"
         (end (+ start (cdr (assoc 'length edit))))
       )
      (set-buffer buffer)
-     ;; (delete-region start end)
-     (goto-char start)
+     (if (> end start) (delete-region start end))
+     (goto-char (+ 1 start))
      (insert (cdr (assoc 'replacement edit)))
      (goto-char point))
    ))))
