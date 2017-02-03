@@ -938,6 +938,25 @@ Argument POINT restore point after inserting new content."
     (insert replacement)
     (goto-char point)))
 
+(defun dart--process-organize-info (response buffer point)
+  "Replace  contents with formatted contents.
+Argument RESPONSE is the reformatted content received from the analysis server.
+Argument BUFFER is the buffer whose contents are to be replaced.
+Argument POINT restore point after inserting new content."
+
+  (dart-info (format "Reporting edit.format : %s" response))
+  (-when-let* ((edit (cdr (assoc 'edits (assoc 'edit (assoc 'result response)))))
+               (l (>  (length edit) 0))
+               (edit (aref edit 0))
+               (start (+ 1 (cdr (assoc 'offset edit))))
+               (end (+ start (cdr (assoc 'length edit))))
+               (replacement  (cdr (assoc 'replacement edit))))
+    (set-buffer buffer)
+    (if (> end start) (delete-region start end))
+    (goto-char start)
+    (insert (cdr (assoc 'replacement edit)))
+    (goto-char point)))
+
 (defun dart--open-file (but &rest ignore)
   "Open the file represented by the current widget.
 Argument BUT The button which describes the file to be opened."
@@ -1135,8 +1154,19 @@ The buffer name is dart-hirerachy"
      (lambda (response)
        (dart--process-format-info response buffer point)))))
 
+(defun dart-imports ()
+  "Formats the entire file"
+  (interactive)
+  (dart--analysis-server-send
+   "edit.organizeDirectives"
+   `((file . ,(buffer-file-name)))
+   (let ((buffer (current-buffer))
+         (point (point)))
+     (lambda (response)
+       (dart--process-organize-info response buffer point)))))
+
 (defun dart-quick-fix ()
-  "Fix"
+  "Apply quick fix"
   (interactive)
   (dart--analysis-server-send
    "edit.getFixes"
@@ -1152,12 +1182,12 @@ The buffer name is dart-hirerachy"
         (editslist (cdr (assoc 'edits (aref fixlist 0))))
         (edit (cdr (aref editslist 0)))
         (edit (aref (cdr (assoc 'edits edit)) 0))
-        (start (cdr (assoc 'offset edit)))
+        (start (+ 1 (cdr (assoc 'offset edit))))
         (end (+ start (cdr (assoc 'length edit))))
       )
      (set-buffer buffer)
      (if (> end start) (delete-region start end))
-     (goto-char (+ 1 start))
+     (goto-char start)
      (insert (cdr (assoc 'replacement edit)))
      (goto-char point))
    ))))
