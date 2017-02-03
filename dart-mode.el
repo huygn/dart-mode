@@ -1378,6 +1378,17 @@ The buffer name is dart-hirerachy"
      (lambda (response)
        (dart--process-organize-info response buffer point)))))
 
+(defun dart-sort-members ()
+  "Formats the entire file"
+  (interactive)
+  (dart--analysis-server-send
+   "edit.sortMembers"
+   `((file . ,(buffer-file-name)))
+   (let ((buffer (current-buffer))
+         (point (point)))
+     (lambda (response)
+       (dart--process-organize-info response buffer point)))))
+
 (defun dart-quick-fix ()
   "Apply quick fix"
   (interactive)
