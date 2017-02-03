@@ -1151,6 +1151,19 @@ Argument POINT restore point after inserting new content."
     (insert replacement)
     (goto-char point)))
 
+(defun dart--apply-edit (buffer point edit)
+  (-when-let* (
+               (start (+ 1 (cdr (assoc 'offset edit))))
+               (end (+ start (cdr (assoc 'length edit))))
+               (replacement  (cdr (assoc 'replacement edit))))
+    (set-buffer buffer)
+    (if (> end start) (delete-region start end))
+    (goto-char start)
+    (insert (cdr (assoc 'replacement edit)))
+    (goto-char point))
+  )
+
+
 (defun dart--process-organize-info (response buffer point)
   "Replace  contents with formatted contents.
 Argument RESPONSE is the reformatted content received from the analysis server.
@@ -1161,14 +1174,8 @@ Argument POINT restore point after inserting new content."
   (-when-let* ((edit (cdr (assoc 'edits (assoc 'edit (assoc 'result response)))))
                (l (>  (length edit) 0))
                (edit (aref edit 0))
-               (start (+ 1 (cdr (assoc 'offset edit))))
-               (end (+ start (cdr (assoc 'length edit))))
-               (replacement  (cdr (assoc 'replacement edit))))
-    (set-buffer buffer)
-    (if (> end start) (delete-region start end))
-    (goto-char start)
-    (insert (cdr (assoc 'replacement edit)))
-    (goto-char point)))
+               )
+    (dart--apply-edit buffer point edit)))
 
 (defun dart--open-file (but &rest ignore)
   "Open the file represented by the current widget.
@@ -1368,7 +1375,7 @@ The buffer name is dart-hirerachy"
        (dart--process-format-info response buffer point)))))
 
 (defun dart-imports ()
-  "Formats the entire file"
+  "Sort import directives"
   (interactive)
   (dart--analysis-server-send
    "edit.organizeDirectives"
@@ -1379,7 +1386,7 @@ The buffer name is dart-hirerachy"
        (dart--process-organize-info response buffer point)))))
 
 (defun dart-sort-members ()
-  "Formats the entire file"
+  "Sort members"
   (interactive)
   (dart--analysis-server-send
    "edit.sortMembers"
@@ -1406,14 +1413,8 @@ The buffer name is dart-hirerachy"
         (editslist (cdr (assoc 'edits (aref fixlist 0))))
         (edit (cdr (aref editslist 0)))
         (edit (aref (cdr (assoc 'edits edit)) 0))
-        (start (+ 1 (cdr (assoc 'offset edit))))
-        (end (+ start (cdr (assoc 'length edit))))
       )
-     (set-buffer buffer)
-     (if (> end start) (delete-region start end))
-     (goto-char start)
-     (insert (cdr (assoc 'replacement edit)))
-     (goto-char point))
+       (dart--apply-edit buffer point edit))
    ))))
 ;;; Initialization
 
