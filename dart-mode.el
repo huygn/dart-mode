@@ -914,9 +914,9 @@ a `before-save-hook'."
   "Specifications for matching errors in dartfmt's output.
 See `compilation-error-regexp-alist' for help on their format.")
 
-(add-to-list 'compilation-error-regexp-alist-alist
-             (cons 'dartfmt dartfmt-compilation-regexp))
-(add-to-list 'compilation-error-regexp-alist 'dartfmt)
+;; (add-to-list 'compilation-error-regexp-alist-alist
+;;              (cons 'dartfmt dartfmt-compilation-regexp))
+;; (add-to-list 'compilation-error-regexp-alist 'dartfmt)
 
 (defun dartfmt ()
   "Format the current buffer according to the dartfmt tool."
@@ -1151,7 +1151,7 @@ Argument POINT restore point after inserting new content."
     (insert replacement)
     (goto-char point)))
 
-(defun dart--apply-edit (buffer point edit)
+(defun dart--apply-edit (buffer edit)
   (-when-let* (
                (start (+ 1 (cdr (assoc 'offset edit))))
                (end (+ start (cdr (assoc 'length edit))))
@@ -1160,7 +1160,7 @@ Argument POINT restore point after inserting new content."
     (if (> end start) (delete-region start end))
     (goto-char start)
     (insert (cdr (assoc 'replacement edit)))
-    (goto-char point))
+    )
   )
 
 
@@ -1175,7 +1175,9 @@ Argument POINT restore point after inserting new content."
                (l (>  (length edit) 0))
                (edit (aref edit 0))
                )
-    (dart--apply-edit buffer point edit)))
+    (dart--apply-edit buffer edit)
+    (goto-char point)
+    ))
 
 (defun dart--open-file (but &rest ignore)
   "Open the file represented by the current widget.
@@ -1410,15 +1412,29 @@ The buffer name is dart-hirerachy"
         (result (cdr (assoc 'result response)))
         (fixes (cdr (assoc 'fixes result)))
         (fixlist (cdr (assoc 'fixes (aref fixes 0))))
-        (editslist (cdr (assoc 'edits (aref fixlist 0))))
-        (edit (cdr (aref editslist 0)))
-        (edit (aref (cdr (assoc 'edits edit)) 0))
+        (messages (mapcar (lambda (x) (cdr (assoc 'message x))) fixlist))
       )
-       (dart--apply-edit buffer point edit))
+       (helm
+        :sources (helm-build-sync-source "Apply quick fix"
+          :candidates messages
+          :action  (lambda (msg)
+            (let* (
+                  (index (cl-position msg messages :test 'equal))
+                  (editslist (cdr (assoc 'edits (aref fixlist index))))
+                  (edit (cdr (aref editslist 0)))
+                  (edit (aref (cdr (assoc 'edits edit)) 0))
+            )
+            (dart--apply-edit buffer edit)
+            )
+            ))
+        :buffer "*dart-quick-fixes*"
+        )
+       )
    ))))
 ;;; Initialization
 
-;;;###autoload (add-to-list 'auto-mode-alist '("\\.dart\\'" . dart-mode))
+;;;###autoload
+(add-to-list 'auto-mode-alist '("\\.dart\\'" . dart-mode))
 
 ;;;###autoload
 (defun dart-mode ()
