@@ -1408,9 +1408,10 @@ The buffer name is dart-hirerachy"
    (let ((buffer (current-buffer))
          (point (point)))
    (lambda (response)
-     (let* (
+     (-when-let* (
         (result (cdr (assoc 'result response)))
         (fixes (cdr (assoc 'fixes result)))
+        (l (>  (length fixes) 0))
         (fixlist (cdr (assoc 'fixes (aref fixes 0))))
         (messages (mapcar (lambda (x) (cdr (assoc 'message x))) fixlist))
       )
