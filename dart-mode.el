@@ -246,7 +246,7 @@
   '("java"
     (c-basic-offset . 2)
     (indent-tabs-mode . nil)
-    (fill-column . 80)
+    (fill-column . 120)
     (c-offsets-alist . ((arglist-intro . ++)
                         (arglist-cont-nonempty . ++)
                         (statement-block-intro . dart-block-offset)
@@ -261,7 +261,6 @@
 (defvar dart-mode-map (c-make-inherited-keymap)
   "Keymap used in ‘dart-mode’ buffers.")
 
-(define-key dart-mode-map (kbd "M-.") 'dart-jump-to-defn)
 ;;; CC indentation support
 
 (defvar c-syntactic-context nil
@@ -525,7 +524,7 @@ The Dart analysis server adds support for error checking, code completion,
 navigation, and more."
   :group 'dart-mode
   :type 'boolean
-  :package-version '(dart-mode . "0.12"))
+  :package-version '(dart-mode . "0.21"))
 
 (defvar dart--analysis-server nil
   "The instance of the Dart analysis server we are communicating with.")
@@ -548,7 +547,7 @@ buffers, even if the buffers have not changed.")
   "The absolute path to the 'dart' executable."
   :group 'dart-mode
   :type 'file
-  :package-version '(dart-mode . "0.12"))
+  :package-version '(dart-mode . "0.21"))
 
 (defvar dart--imenu-candidates nil
   "Store formatted imenu candidates")
@@ -562,7 +561,7 @@ buffers, even if the buffers have not changed.")
   "The absolute path to the snapshot file that runs the Dart analysis server."
   :group 'dart-mode
   :type 'file
-  :package-version '(dart-mode . "0.12"))
+  :package-version '(dart-mode . "0.21"))
 
 (defvar dart-analysis-roots nil
   "The list of analysis roots that are known to the analysis server.
@@ -717,8 +716,14 @@ The constructed request will call METHOD with optional PARAMS."
 
 (defun dart--analysis-server-on-error-callback (response)
   "If RESPONSE has an error, report it."
-  (-when-let (resp-err (assoc-default 'error response))
-    (error "Analysis server error: %s" (assoc-default 'message resp-err))))
+
+  (if (eq "server.error" (assoc-default 'event response))
+      (-when-let (resp-err (assoc-default 'params response))
+        (error "Analysis server error: %s" (assoc-default 'message resp-err)))
+    (-when-let (resp-err (assoc-default 'error response))
+      (error "Analysis server error: %s" (assoc-default 'message resp-err)))
+    )
+  )
 
 (defun dart--analysis-server-enqueue (req-without-id callback)
   "Send REQ-WITHOUT-ID to the analysis server, call CALLBACK with the result."
@@ -1467,3 +1472,124 @@ Key bindings:
 (provide 'dart-mode)
 
 ;;; dart-mode.el ends here
+;;; company-dart.el --- Autocompletion for Dart files -*- lexical-binding: t; -*-
+
+;; Author: Sidart Kurias
+;; Version: 0.01
+;; Package-Requires: ((dart-mode "0.14") (company-mode) (pos-tip "0.4.6"))
+;; Keywords: language
+
+;;
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; Add something similar to your init file
+;; (add-hook 'dart-mode-hook (lambda ()
+;;    (set (make-local-variable 'company-backends)
+;;      '(company-dart (company-dabbrev company-yasnippet)))))
+;;
+;; Dart completion will be invoked only after the "." character has been typed.
+;; You can manually invoke completion by binding (company-dart)
+;; to any key you like. Hitting F1 while in the completion list will show the
+;; documentation for that candidate.
+;;
+;; A good source for snippets
+;; https://github.com/JEG2/dotfiles/tree/master/emacs.d/jeg2/snippets/dart-mode/
+;;
+;; https://github.com/expez/company-quickhelp. Shows complete documentation as
+;; a popup.
+;;
+
+;;; Code:
+(require 'dart-mode)
+(require 'company)
+(require 'pos-tip)
+
+(defun dart--company-prepare-candidates (response)
+  "Build completion from the parsed data received from the analysis server.
+
+Argument RESPONSE contains the candidates, documentation, parameters to be displayed."
+  (-when-let* ((completions (cdr (assq 'results (assq 'params response)))))
+    (mapcar
+     (lambda (completion)
+       (let ((docSummary (assoc 'docSummary completion))
+	     (parameters  (assoc 'parameters (assoc 'element completion)))
+	     (docComplete  (assoc 'docComplete completion))
+	     (candidate (cdr (assq 'completion completion))))
+	 (propertize  candidate
+		      (car parameters) (cdr parameters)
+		      (car docSummary) (cdr docSummary)
+		      (car docComplete) (cdr docComplete))))
+     completions)))
+
+
+(defun dart--get-completions (callback buffer)
+  "Ask the analysis server for suggestions.
+
+Argument CALLBACK is the function passed by  ‘company-mode’.
+Argument BUFFER the buffer containing the dart file."
+
+  (dart--analysis-server-send
+   "completion.getSuggestions"
+   `((file . ,(buffer-file-name))
+     (offset . ,(point)))
+   (lambda (response)
+     ;;set the dart-completion-callback on dart-mode, so that it will in turn
+     ;;execute company mode callback.
+     (setq dart-completion-callback
+	   (lambda (resp)
+	     (-when-let* ((candidates (dart--company-prepare-candidates
+				       resp)))
+	       (with-current-buffer buffer
+		 (funcall callback  candidates))))))))
+
+(defun dart--completion-annotation (s)
+  "Show method parameters as annotations"
+  (get-text-property 0 'parameters s))
+
+(defun dart--completion-meta (s)
+  "Show summary documentation."
+  (get-text-property 0 'docSummary s))
+
+(defun dart--completion-doc (s)
+  "Show complete documentation in the help buffer."
+  (--when-let (get-text-property 0 'docComplete s)
+    (company-doc-buffer it)))
+
+(defun dart--company-prefix ()
+  (let ((sym (company-grab-symbol-cons "\\." 1)))
+    (if (consp sym) sym nil)))
+
+;;;###autoload
+(defun company-dart (command &optional arg &rest ignored)
+  (interactive (list 'interactive))
+  (case command
+    (interactive (company-begin-backend 'company-dart))
+    (prefix (and (derived-mode-p 'dart-mode)
+		 (dart--company-prefix)))
+    (candidates
+     (cons :async
+	   (lambda (callback)
+	     (dart--get-completions callback (current-buffer)))))
+    (duplicates t)
+    (annotation (dart--completion-annotation arg))
+    (doc-buffer (dart--completion-doc arg))
+    (meta (dart--completion-meta arg))
+    (post-completion (let ((anno (dart--completion-annotation arg))
+			   (meta (dart--completion-meta arg)))
+    		       (when anno
+			 (pos-tip-show (format "%s\n%s" anno meta) nil nil nil -1))))))
+
+(provide 'company-dart)
