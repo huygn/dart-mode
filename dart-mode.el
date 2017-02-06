@@ -580,9 +580,7 @@ the JSON decoded server response.")
 
 (defun dart-info (msg)
   "Logs MSG to the dart log if `dart-debug' is non-nil."
-  (dart-log msg)
-  )
-  ;; (when dart-debug (dart-log msg)))
+  (when dart-debug (dart-log msg)))
 
 (defun dart-log (msg)
   "Logs MSG to the dart log."
