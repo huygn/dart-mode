@@ -34,6 +34,9 @@ Dart Mode is a major mode for editing Dart files in Emacs.
     2. dart-jump-to-defn: bind to a key and navigate source code
     3. dart-type-hierarchy: bind to a key and show the type hierachy
     4. dart-hover-information: bind to key and show dartdocs for the element
+    5. dart-imports: sort import directives
+    6. dart-sort-members: sort all imports
+    7. dart-quick-fix: apply quick fix
 
 1. Use [company-dart] (https://github.com/sid-kurias/company-dart) to get intellisense
    like support.
