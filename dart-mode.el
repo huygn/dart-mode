@@ -1,10 +1,10 @@
 ;;; dart-mode.el --- Major mode for editing Dart files -*- lexical-binding: t; -*-
 
-;; Author: Natalie Weizenbaum
-;; URL: http://code.google.com/p/dart-mode
-;; Version: 0.14
+;; Author: Natalie Weizenbaum, Sidart Kurias
+;; URL: https://github.com/sid-kurias/dart-mode
+;; Version: 0.20
 ;; Package-Requires: ((cl-lib "0.5") (dash "2.10.0") (flycheck "0.23") (pos-tip "0.4.5""))
-;; Keywords: language
+;; Keywords: language, dart
 
 ;; Copyright (C) 2011 Google Inc.
 ;;
@@ -56,7 +56,7 @@
 
 ;;; Commentary:
 
-;; To install, see https://github.com/nex3/dart-mode/blob/master/README.md
+;; To install, see https://github.com/sid-kurias/dart-mode/README.md
 ;;
 ;; Known bugs:
 ;;
@@ -252,7 +252,7 @@
                         (statement-block-intro . dart-block-offset)
                         (block-close . dart-block-offset)
                         (dart-brace-list-cont-nonempty .
-                         dart-brace-list-cont-nonempty-offset)
+						       dart-brace-list-cont-nonempty-offset)
                         (case-label . +))))
   "The default Dart styles.")
 
@@ -368,7 +368,7 @@ SYNTAX-GUESS is the output of `c-guess-basic-syntax'."
 
          ;; Handle map literal indentation
          (when (and (memq type '(label statement-block-intro statement-cont statement
-                                 block-close defun-block-intro defun-close))
+				       block-close defun-block-intro defun-close))
                     (not (dart-in-block-p ad-return-value)))
            (save-excursion
              (c-safe
@@ -418,18 +418,18 @@ SYNTAX-GUESS is the output of `c-guess-basic-syntax'."
         (while (and
                 (c-syntactic-re-search-forward "[;{]" nil 'move t t)
                 (c-end-of-current-token base))
-        (setq base (point)))))))
+	  (setq base (point)))))))
 
 (if (fboundp 'c-parse-state-1)
-  (defadvice c-parse-state (around dart-c-parse-state activate)
-    (if (not (c-major-mode-is 'dart-mode)) ad-do-it
-      ;; c-parse-state is a wrapper around c-parse-state-1 that does some tricks
-      ;; to ensure that dangling brackets in preprocessor commands don't screw up
-      ;; parse information for the real world. In Dart, all "preprocessor"
-      ;; directives have matched braces, so we don't need to worry about that. The
-      ;; wrapper was also screwing up indentation in weird ways, so we just ignore
-      ;; it.
-      (setq ad-return-value (c-parse-state-1)))))
+    (defadvice c-parse-state (around dart-c-parse-state activate)
+      (if (not (c-major-mode-is 'dart-mode)) ad-do-it
+	;; c-parse-state is a wrapper around c-parse-state-1 that does some tricks
+	;; to ensure that dangling brackets in preprocessor commands don't screw up
+	;; parse information for the real world. In Dart, all "preprocessor"
+	;; directives have matched braces, so we don't need to worry about that. The
+	;; wrapper was also screwing up indentation in weird ways, so we just ignore
+	;; it.
+	(setq ad-return-value (c-parse-state-1)))))
 
 
 ;;; Additional fontification support
@@ -533,7 +533,7 @@ The Dart analysis server adds support for error checking, code completion,
 navigation, and more."
   :group 'dart-mode
   :type 'boolean
-  :package-version '(dart-mode . "0.12"))
+  :package-version '(dart-mode . "0.20"))
 
 (defvar dart--analysis-server nil
   "The instance of the Dart analysis server we are communicating with.")
@@ -557,7 +557,7 @@ buffers, even if the buffers have not changed.")
   "The absolute path to the 'dart' executable."
   :group 'dart-mode
   :type 'file
-  :package-version '(dart-mode . "0.12"))
+  :package-version '(dart-mode . "0.20"))
 
 (defvar dart--imenu-candidates nil
   "Store formatted imenu candidates")
@@ -571,7 +571,7 @@ buffers, even if the buffers have not changed.")
   "The absolute path to the snapshot file that runs the Dart analysis server."
   :group 'dart-mode
   :type 'file
-  :package-version '(dart-mode . "0.12"))
+  :package-version '(dart-mode . "0.20"))
 
 (defvar dart-analysis-roots nil
   "The list of analysis roots that are known to the analysis server.
@@ -642,9 +642,9 @@ directory or the current file directory to the analysis roots."
 (defun dart--analysis-server-create (process)
   "Create a Dart analysis server from PROCESS."
   (let* ((buffer (generate-new-buffer (process-name process)))
-                 (instance (dart--make-analysis-server
-                            :process process
-                            :buffer buffer)))
+	 (instance (dart--make-analysis-server
+		    :process process
+		    :buffer buffer)))
     (buffer-disable-undo (dart--analysis-server-buffer instance))
     (set-process-filter
      process
@@ -728,6 +728,7 @@ with the JSON decoded response.  Otherwise, the output will just be checked."
 
 (defun dart--analysis-server-make-request (method &optional params)
   "Construct a request for the analysis server.
+
 The constructed request will call METHOD with optional PARAMS."
   `((method . ,method) (params . ,params)))
 
@@ -791,24 +792,24 @@ the callback for that request is given the json decoded response."
   "Extracts data and return as a list.
 
 Argument CHILDREN the list from which hierarchy is extracted."
-(let (newlist '())
-  (mapc (lambda (child)
-	      (let* ((element (cdr (assoc 'element child)))
-		     (e-name (cdr (assoc 'name element)))
-		     (offset (cdr (assoc 'offset (cdr (assoc 'location
-	       	     					     element))))))
+  (let (newlist '())
+    (mapc (lambda (child)
+	    (let* ((element (cdr (assoc 'element child)))
+		   (e-name (cdr (assoc 'name element)))
+		   (offset (cdr (assoc 'offset (cdr (assoc 'location
+							   element))))))
 	      (push (cons e-name offset) newlist)))
-	children)
-  newlist))
+	  children)
+    newlist))
 
 (defun dart--outline-file (elements)
   "Builds the structure needed by Imenu.
 
 Argument ELEMENTS  may be a class or top level functions"
   (let* ((name (cdr (assoc 'name (cdr (assoc 'element elements)))))
-	(children (cdr (assoc 'children elements)))
-	(class-items (if children (dart--extract-outline children)
-		       (dart--extract-outline (list elements)))))
+	 (children (cdr (assoc 'children elements)))
+	 (class-items (if children (dart--extract-outline children)
+			(dart--extract-outline (list elements)))))
     (if class-items `(,name . ,class-items))))
 
 (defun dart--execute-outline-callback (msg)
@@ -914,7 +915,7 @@ reported to CALLBACK."
 
 ;;; Formatting
 
-(defcustom dartfmt-command "dartfmt"
+(defcustom dartfmt-command (file-truename (executable-find "dartfmt"))
   "The 'dartfmt' command."
   :type 'string
   :group 'dart-mode)
@@ -966,8 +967,8 @@ See `compilation-error-regexp-alist' for help on their format.")
             (erase-buffer))
           (write-region nil nil tmpfile)
           (setq our-dartfmt-args (append our-dartfmt-args
-                                       dartfmt-args
-                                       (list "-w" tmpfile)))
+					 dartfmt-args
+					 (list "-w" tmpfile)))
           (message "Calling dartfmt: %s %s" dartfmt-command our-dartfmt-args)
           (if (zerop (apply #'call-process dartfmt-command nil errbuf nil our-dartfmt-args))
               (progn
@@ -1046,21 +1047,9 @@ See `compilation-error-regexp-alist' for help on their format.")
       (display-buffer errbuf))))
 
 ;;;###autoload
-(defun dartfmt-before-save ()
-  "Add this to .emacs to run dartfmt on the current buffer when saving:
- (add-hook 'before-save-hook 'dartfmt-before-save).
-
-Note that this will cause dart-mode to get loaded the first time
-you save any file, kind of defeating the point of autoloading."
-
-  (interactive)
-  (when (eq major-mode 'dart-mode) (dartfmt)))
-
-
-;;; Utility functions
-
 (defun dart-beginning-of-statement ()
   "Moves to the beginning of a Dart statement.
+
 Unlike `c-beginning-of-statement', this handles maps correctly
 and will move to the top level of a bracketed statement."
   (while
@@ -1085,7 +1074,7 @@ true for positions before the start of the statement, but on its line."
      (skip-syntax-backward " ")
      (when (bolp)
        (cl-loop do (forward-char -1)
-             while (looking-at "^ *$"))
+		while (looking-at "^ *$"))
        (skip-syntax-backward " ")
        (cl-case (char-before)
          ((?} ?\;) t)
@@ -1098,6 +1087,7 @@ true for positions before the start of the statement, but on its line."
 
 (defun dart--delete-whole-line (&optional arg)
   "Delete the current line without putting it in the `kill-ring'.
+
 Derived from function `kill-whole-line'.  ARG is defined as for that
 function."
   (setq arg (or arg 1))
@@ -1126,6 +1116,7 @@ function."
 
 (defun dart--process-nav-info (response offset)
   "Report the possible completions and jump to the location of the definition.
+
 Opens a new file in a new buffer if necessary.
 Argument RESPONSE holds the navigation information received from the analysis
 server.
@@ -1182,16 +1173,13 @@ Argument POINT restore point after inserting new content."
     (goto-char point)))
 
 (defun dart--apply-edit (buffer edit)
-  (-when-let* (
-               (start (+ 1 (cdr (assoc 'offset edit))))
+  (-when-let* ((start (+ 1 (cdr (assoc 'offset edit))))
                (end (+ start (cdr (assoc 'length edit))))
                (replacement  (cdr (assoc 'replacement edit))))
-    (set-buffer buffer)
-    (if (> end start) (delete-region start end))
-    (goto-char start)
-    (insert (cdr (assoc 'replacement edit)))
-    )
-  )
+    (with-current-buffer buffer
+      (if (> end start) (delete-region start end))
+      (goto-char start)
+      (insert replacement))))
 
 
 (defun dart--process-organize-info (response buffer point)
@@ -1203,11 +1191,9 @@ Argument POINT restore point after inserting new content."
   (dart-info (format "Reporting edit.format : %s" response))
   (-when-let* ((edit (cdr (assoc 'edits (assoc 'edit (assoc 'result response)))))
                (l (>  (length edit) 0))
-               (edit (aref edit 0))
-               )
+               (edit (aref edit 0)))
     (dart--apply-edit buffer edit)
-    (goto-char point)
-    ))
+    (goto-char point)))
 
 (defun dart--open-file (but &rest ignore)
   "Open the file represented by the current widget.
@@ -1392,22 +1378,8 @@ The buffer name is dart-hirerachy"
 	 (end-offset (- (cdr bounds) 1)))
     (dart--process-nav-info dart--navigation-response start-offset)))
 
-(defun dart-format-file ()
-  "Formats the entire file"
-  (interactive)
-  (dart--analysis-server-send
-   "edit.format"
-   `((file . ,(buffer-file-name))
-     (selectionOffset . ,(point-min))
-     (selectionLength . ,(- (buffer-size) 1))
-     (lineLength . 120))
-   (let ((buffer (current-buffer))
-	 (point (point)))
-     (lambda (response)
-       (dart--process-format-info response buffer point)))))
-
 (defun dart-imports ()
-  "Sort import directives"
+  "Organizes all of the directives - removes unused imports and sorts directives"
   (interactive)
   (dart--analysis-server-send
    "edit.organizeDirectives"
@@ -1418,7 +1390,7 @@ The buffer name is dart-hirerachy"
        (dart--process-organize-info response buffer point)))))
 
 (defun dart-sort-members ()
-  "Sort members"
+  "Sort all of the directives, unit and class members of the given Dart file."
   (interactive)
   (dart--analysis-server-send
    "edit.sortMembers"
@@ -1428,40 +1400,25 @@ The buffer name is dart-hirerachy"
      (lambda (response)
        (dart--process-organize-info response buffer point)))))
 
-(defun dart-quick-fix ()
-  "Apply quick fix"
-  (interactive)
+(defun dart-quick-fix (comp-cb)
+  "Apply quick fix.
+Argument COMP-CB The callback provided by the completion system.
+
+COMP-CB should take two arguments, a list of fixes and a callback
+that will apply the edit to the dart file. The completion system will invoke
+this method. See helm-dart.el."
   (dart--analysis-server-send
    "edit.getFixes"
    `((file . ,(buffer-file-name))
      (offset . ,(1- (point))))
-   (let ((buffer (current-buffer))
-         (point (point)))
-   (lambda (response)
-     (-when-let* (
-        (result (cdr (assoc 'result response)))
-        (fixes (cdr (assoc 'fixes result)))
-        (l (>  (length fixes) 0))
-        (fixlist (cdr (assoc 'fixes (aref fixes 0))))
-        (messages (mapcar (lambda (x) (cdr (assoc 'message x))) fixlist))
-      )
-       (helm
-        :sources (helm-build-sync-source "Apply quick fix"
-          :candidates messages
-          :action  (lambda (msg)
-            (let* (
-                  (index (cl-position msg messages :test 'equal))
-                  (editslist (cdr (assoc 'edits (aref fixlist index))))
-                  (edit (cdr (aref editslist 0)))
-                  (edit (aref (cdr (assoc 'edits edit)) 0))
-            )
-            (dart--apply-edit buffer edit)
-            )
-            ))
-        :buffer "*dart-quick-fixes*"
-        )
-       )
-   ))))
+   (let ((buffer (current-buffer)))
+     (lambda (response)
+       (-when-let* ((result (cdr (assoc 'result response)))
+		    (fixes (cdr (assoc 'fixes result)))
+		    (l (>  (length fixes) 0))
+		    (fixlist (cdr (assoc 'fixes (aref fixes 0)))))
+	 (funcall comp-cb fixlist (apply-partially 'dart--apply-edit buffer)))))))
+
 ;;; Initialization
 
 ;;;###autoload
@@ -1470,6 +1427,7 @@ The buffer name is dart-hirerachy"
 ;;;###autoload
 (defun dart-mode ()
   "Major mode for editing Dart files.
+
 The hook `c-mode-common-hook' is run with no args at mode
 initialization, then `dart-mode-hook'.
 Key bindings:
