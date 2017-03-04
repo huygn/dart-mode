@@ -11,10 +11,15 @@ Dart Mode is a major mode for editing Dart files in Emacs.
 	Add helm-dart.el to your load path to get helm completions for the quick fix
     feature. 
 	
+1.	The analysis server is turned on by default. To turn it off, add the
+      following to your `.emacs` init file
+	  ```
+     (setq dart-enable-analysis-server nil)
+	```
+	
 1.  OPTIONAL: To enable on-the-fly syntax checking, add the
     following to your `.emacs` file:
     ```
-    (setq dart-enable-analysis-server t)
     (add-hook 'dart-mode-hook 'flycheck-mode)
     ```
 
@@ -28,7 +33,12 @@ Dart Mode is a major mode for editing Dart files in Emacs.
 1.  OPTIONAL: To view the class hierarchy install tree-mode
 
 1.  Features & functions: Provides the following functions
-    1. dart-format-file: can be called on a save file hook
+    1. dartfmt: can be called on a save file hook
+	   To vary the line length that dartfmt uses
+	   ```
+	    (setq dartfmt-args (quote ("-l 90")))	
+        will set it to 90 characters. Default is 80 characters.
+	   ```
     2. dart-jump-to-defn: Navigate source code (bound to M-.)
     3. dart-type-hierarchy: bind to a key and show the type hierachy
     4. dart-hover-information: bind to key and show dartdocs for the element
