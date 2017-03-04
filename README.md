@@ -34,7 +34,7 @@ Dart Mode is a major mode for editing Dart files in Emacs.
 
 1.  Features & functions: Provides the following functions
     1. dartfmt: can be called on a save file hook
-	   To vary the line length that dartfmt uses
+	   To vary the line length that dartfmt uses  
 	   ```
 	    (setq dartfmt-args (quote ("-l 90")))	
         will set it to 90 characters. Default is 80 characters.
