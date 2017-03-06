@@ -526,7 +526,7 @@ The slots are:
 (defvar dart-debug nil
   "If non-nil, enables writing debug messages for dart-mode.")
 
-(defcustom dart-enable-analysis-server nil
+(defcustom dart-enable-analysis-server 't
   "If non-nil, enables support for Dart analysis server.
 
 The Dart analysis server adds support for error checking, code completion,
