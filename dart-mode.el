@@ -625,8 +625,9 @@ directory or the current file directory to the analysis roots."
 (defun dart-start-analysis-server ()
   "Start the Dart analysis server."
   (when dart--analysis-server
-    (kill-process
-     (dart--analysis-server-process dart--analysis-server))
+    (ignore-errors
+      (kill-process
+       (dart--analysis-server-process dart--analysis-server)))
     (kill-buffer (dart--analysis-server-buffer dart--analysis-server)))
   (let* ((process-connection-type nil)
          (dart-process
